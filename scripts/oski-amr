@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+case "${1:-}" in
+    license)
+        cat <<'EOF'
+AMR-NB/WB support in this Oski target is built from source code whose license permits redistribution.
+
+Oski does not grant AMR-NB or AMR-WB patent licenses. Commercial users must obtain any required patent licenses independently before distributing or using AMR functionality.
+EOF
+        ;;
+    *)
+        echo "usage: oski-amr license" >&2
+        exit 2
+        ;;
+esac

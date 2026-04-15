@@ -1,19 +1,19 @@
 # Project Licensing Notice
 
-This project (Oski) is a fork of the `static-ffmpeg` project, which was originally 
-licensed under the MIT License. A copy of the original license is included in this 
-repository as `LICENSE.MIT`.
+Oski is a fork of `static-ffmpeg`, which was originally licensed under the MIT
+License. A copy of that license is included in this repository as `LICENSE.MIT`.
 
-All modifications and new contributions made to the Oski project are sublicensed 
-and distributed under the terms of the BSD 2-Clause License, which can be found 
-in the `LICENSE.BSD` file.
+Oski's own source code, scripts, and Dockerfile modifications are licensed under
+BSD 2-Clause; see `LICENSE.BSD`.
 
-The primary goal of this fork is to provide a static FFmpeg build that removes 
-all non-permissive (GPL, LGPL, non-free) libraries, making it suitable for a 
-wider range of uses.
+The FFmpeg binaries and libraries produced by Oski are licensed under
+LGPL-3.0-or-later. They are intended to be GPL-free and FFmpeg `nonfree`-free.
 
-All files MODIFIED from the original project will inlcude an appropriate notice
-that credits the author at the head of the file. 
+External libraries linked into FFmpeg retain their upstream licenses. Each image
+includes `/license.json` with the effective license, enabled external libraries,
+and target metadata.
 
-All files which are NEW, and ADDED to Oski will contain the BSD 2-Clause License
-that credits the author at the head of the file.
+Patent-encumbered codecs are isolated from the default image. H.264 encoding is
+available only through the `openh264-runtime` target with a Cisco binary sidecar;
+AMR-NB/WB support is available only through the `amr-runtime` target. Patent
+licensing for those codecs is the user's responsibility.

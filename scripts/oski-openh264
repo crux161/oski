@@ -1,0 +1,120 @@
+#!/bin/sh
+set -eu
+
+CONTROL_TEXT="OpenH264 Video Codec provided by Cisco Systems, Inc."
+VERSION=${OSKI_OPENH264_VERSION:-2.6.0}
+SONAME=${OSKI_OPENH264_SONAME:-8}
+INSTALL_DIR=${OSKI_OPENH264_DIR:-/usr/local/lib}
+LICENSE_URL=${OSKI_OPENH264_LICENSE_URL:-https://www.openh264.org/BINARY_LICENSE.txt}
+
+arch_name() {
+    case "$(uname -m)" in
+        x86_64|amd64) echo "linux64" ;;
+        aarch64|arm64) echo "linux-arm64" ;;
+        armv7*|armhf) echo "linux-arm" ;;
+        i386|i686) echo "linux32" ;;
+        *)
+            echo "unsupported architecture: $(uname -m)" >&2
+            exit 1
+            ;;
+    esac
+}
+
+artifact_name() {
+    echo "libopenh264-${VERSION}-$(arch_name).${SONAME}.so"
+}
+
+artifact_url() {
+    echo "http://ciscobinary.openh264.org/$(artifact_name).bz2"
+}
+
+installed_path() {
+    echo "${INSTALL_DIR}/libopenh264.so.${SONAME}"
+}
+
+manifest_sha() {
+    case "$(arch_name)" in
+        linux64) echo "${OSKI_OPENH264_SHA256_LINUX64:-27ab53323c110b76214c1c72222f459d17febbcd1e252136cadc292b0308d75b}" ;;
+        linux-arm64) echo "${OSKI_OPENH264_SHA256_LINUX_ARM64:-a78aea7970150f46bcd3bb7994c9e6dd90bd7a9ea785920f5a73f6964e3fcda7}" ;;
+        linux-arm) echo "${OSKI_OPENH264_SHA256_LINUX_ARM:-}" ;;
+        linux32) echo "${OSKI_OPENH264_SHA256_LINUX32:-}" ;;
+    esac
+}
+
+print_license() {
+    echo "$CONTROL_TEXT"
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsSL "$LICENSE_URL"
+    elif command -v wget >/dev/null 2>&1; then
+        wget -qO- "$LICENSE_URL"
+    else
+        echo "Unable to fetch $LICENSE_URL: curl or wget is required." >&2
+        exit 1
+    fi
+}
+
+case "${1:-}" in
+    enable)
+        shift
+        accepted=no
+        for arg in "$@"; do
+            case "$arg" in
+                --accept-license) accepted=yes ;;
+                *)
+                    echo "unknown argument: $arg" >&2
+                    exit 2
+                    ;;
+            esac
+        done
+        echo "$CONTROL_TEXT"
+        if [ "$accepted" != yes ]; then
+            echo "Refusing to install OpenH264 sidecar without --accept-license." >&2
+            echo "Run 'oski-openh264 license' to review the Cisco binary license." >&2
+            exit 1
+        fi
+        tmp=$(mktemp -d)
+        trap 'rm -rf "$tmp"' EXIT
+        url=$(artifact_url)
+        artifact=$(artifact_name)
+        curl -fL "$url" -o "$tmp/${artifact}.bz2"
+        expected=$(manifest_sha)
+        if [ -n "$expected" ]; then
+            actual=$(sha256sum "$tmp/${artifact}.bz2" | awk '{print $1}')
+            if [ "$actual" != "$expected" ]; then
+                echo "FAIL: OpenH264 SHA-256 mismatch: $actual != $expected" >&2
+                exit 1
+            fi
+        else
+            echo "WARNING: no pinned SHA-256 provided for $(arch_name); set OSKI_OPENH264_SHA256_* to enforce verification." >&2
+        fi
+        bzip2 -d "$tmp/${artifact}.bz2"
+        mkdir -p "$INSTALL_DIR"
+        install -m 0755 "$tmp/$artifact" "$(installed_path)"
+        ln -sf "libopenh264.so.${SONAME}" "${INSTALL_DIR}/libopenh264.so"
+        echo "installed $(installed_path)"
+        ;;
+    disable)
+        echo "$CONTROL_TEXT"
+        rm -f "$(installed_path)" "${INSTALL_DIR}/libopenh264.so"
+        echo "disabled OpenH264 sidecar"
+        ;;
+    status)
+        if [ -f "$(installed_path)" ]; then
+            sha=$(sha256sum "$(installed_path)" | awk '{print $1}')
+            echo "$CONTROL_TEXT"
+            echo "present: $(installed_path)"
+            echo "version: $VERSION"
+            echo "sha256: $sha"
+        else
+            echo "missing: $(installed_path)"
+            exit 1
+        fi
+        ;;
+    license)
+        print_license
+        ;;
+    *)
+        echo "usage: oski-openh264 enable --accept-license | disable | status | license" >&2
+        exit 2
+        ;;
+esac

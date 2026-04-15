@@ -9,31 +9,46 @@ on:
   workflow_dispatch:
 
 env:
-  REGISTRY_IMAGE: mwader/static-ffmpeg
+  REGISTRY_IMAGE: oski
 
 jobs:
   build:
     name: Build image
     strategy:
+      fail-fast: false
       matrix:
         include:
           - runs_on: ubicloud-standard-8-arm
-            tag: arm64
+            arch: arm64
+            target: ffmpeg-bin
+          - runs_on: ubicloud-standard-8-arm
+            arch: arm64
+            target: ffmpeg-dev
+          - runs_on: ubicloud-standard-8-arm
+            arch: arm64
+            target: ffmpeg-shared
           - runs_on: ubuntu-latest
-            tag: amd64
+            arch: amd64
+            target: ffmpeg-bin
+          - runs_on: ubuntu-latest
+            arch: amd64
+            target: ffmpeg-dev
+          - runs_on: ubuntu-latest
+            arch: amd64
+            target: ffmpeg-shared
 
     runs-on: ${{ matrix.runs_on }}
     steps:
       - uses: actions/checkout@v4
       - name: Docker build
-        run: docker build --tag image:${{ matrix.tag }} .
+        run: docker build --target ${{ matrix.target }} --tag image:${{ matrix.target }}-${{ matrix.arch }} .
       - name: Docker save
-        run: docker image save --output image-${{ matrix.tag }}.tar image:${{ matrix.tag }}
-      - name: Upload Docker image-${{ matrix.tag }}
+        run: docker image save --output image-${{ matrix.target }}-${{ matrix.arch }}.tar image:${{ matrix.target }}-${{ matrix.arch }}
+      - name: Upload Docker image
         uses: actions/upload-artifact@v4
         with:
-          name: image-${{ matrix.tag }}
-          path: image-${{ matrix.tag }}.tar
+          name: image-${{ matrix.target }}-${{ matrix.arch }}
+          path: image-${{ matrix.target }}-${{ matrix.arch }}.tar
           retention-days: 1
 
   tag:
@@ -46,9 +61,9 @@ jobs:
         id: tag
         run: |
           jq -nr '
-            ( env.GITHUB_REF # refs/heads|tags/abc
+            ( env.GITHUB_REF
             | split("/")[1:]
-            | "result=" + if . == ["heads","master"] then "latest" else .[1] end
+            | "result=" + if . == ["heads","master"] then "8.0" else .[1] end
             )
           ' >> "$GITHUB_OUTPUT"
 
@@ -59,7 +74,7 @@ jobs:
       - build
       - tag
     steps:
-      - name: Download digests
+      - name: Download images
         uses: actions/download-artifact@v4
         with:
           path: /tmp
@@ -67,27 +82,30 @@ jobs:
           merge-multiple: true
       - name: Load Docker images
         run: |
-          docker image load --input /tmp/image-arm64.tar
-          docker image load --input /tmp/image-amd64.tar
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY_IMAGE }}
+          for image in /tmp/image-*.tar; do
+            docker image load --input "$image"
+          done
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      - name: Create manifest list and push
+      - name: Create manifest lists and push
         run: |
-          docker tag image:arm64 ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}-arm64
-          docker tag image:amd64 ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}-amd64
-          docker push ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}-arm64
-          docker push ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}-amd64
-          docker manifest create \
-            ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }} \
-            --amend ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}-arm64 \
-            --amend ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}-amd64
-          docker manifest inspect ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}
-          docker manifest push ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}
+          set -eu
+          for target in ffmpeg-bin ffmpeg-dev ffmpeg-shared; do
+            suffix=""
+            if [ "$target" = "ffmpeg-dev" ]; then suffix="-dev"; fi
+            if [ "$target" = "ffmpeg-shared" ]; then suffix="-shared"; fi
+
+            docker tag image:${target}-arm64 ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix}-arm64
+            docker tag image:${target}-amd64 ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix}-amd64
+            docker push ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix}-arm64
+            docker push ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix}-amd64
+            docker manifest create \
+              ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix} \
+              --amend ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix}-arm64 \
+              --amend ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix}-amd64
+            docker manifest inspect ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix}
+            docker manifest push ${{ env.REGISTRY_IMAGE }}:${{ needs.tag.outputs.TAG }}${suffix}
+          done

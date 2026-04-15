@@ -1,0 +1,42 @@
+name: Weekly opt-in codec builds
+
+on:
+  schedule:
+    - cron: '0 16 * * 0'
+  workflow_dispatch:
+
+jobs:
+  opt_in:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runs_on: ubuntu-latest
+            target: openh264-runtime
+          - runs_on: ubuntu-latest
+            target: amr-runtime
+          - runs_on: ubicloud-standard-8-arm
+            target: openh264-runtime
+          - runs_on: ubicloud-standard-8-arm
+            target: amr-runtime
+    runs-on: ${{ matrix.runs_on }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ${{ matrix.target }}
+        run: docker build --target ${{ matrix.target }} --tag oski:${{ matrix.target }} .
+      - name: OpenH264 sidecar smoke
+        if: matrix.target == 'openh264-runtime'
+        run: |
+          docker run --rm --entrypoint /bin/sh oski:openh264-runtime -c '
+            oski-openh264 enable --accept-license &&
+            /ffmpeg -f lavfi -i testsrc=duration=0.1 -c:v libopenh264 -profile:v constrained_baseline -f null - &&
+            oski-openh264 status &&
+            oski-openh264 disable
+          '
+      - name: AMR smoke
+        if: matrix.target == 'amr-runtime'
+        run: |
+          docker run --rm --entrypoint /bin/sh oski:amr-runtime -c '
+            /ffmpeg -f lavfi -i sine=frequency=440:duration=0.1 -c:a libopencore_amrnb -ar 8000 -ac 1 -f amr -y /tmp/out.amr &&
+            /ffmpeg -i /tmp/out.amr -f null -
+          '

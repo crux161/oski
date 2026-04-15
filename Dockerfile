@@ -41,8 +41,6 @@ RUN apk add --no-cache $APK_OPTS \
   tcl \
   numactl-dev \
   cunit cunit-dev \
-  fftw-dev \
-  libsamplerate-dev libsamplerate-static \
   vo-amrwbenc-dev vo-amrwbenc-static \
   snappy snappy-dev snappy-static \
   xxd \
@@ -217,17 +215,18 @@ RUN \
     .. && \
   make -j$(nproc) install
 
-# bump: libaribb24 /LIBARIBB24_VERSION=([\d.]+)/ https://github.com/nkoriyama/aribb24.git|*
-# bump: libaribb24 after ./hashupdate Dockerfile LIBARIBB24 $LATEST
-# bump: libaribb24 link "Release notes" https://github.com/nkoriyama/aribb24/releases/tag/$LATEST
-ARG LIBARIBB24_VERSION=1.0.3
-ARG LIBARIBB24_URL="https://github.com/nkoriyama/aribb24/archive/v$LIBARIBB24_VERSION.tar.gz"
-ARG LIBARIBB24_SHA256=f61560738926e57f9173510389634d8c06cabedfa857db4b28fb7704707ff128
+# libaribb24's v1.0.3 tag predates the LGPLv3 relicensing commit. FFmpeg 8.0
+# requires a post-1.0.3 libaribb24 build unless --enable-gpl is used.
+ARG LIBARIBB24_VERSION=1.0.4
+ARG LIBARIBB24_COMMIT=5e9be272f96e00f15a2f3c5f8ba7e124862aec38
+ARG LIBARIBB24_URL="https://github.com/nkoriyama/aribb24/archive/$LIBARIBB24_COMMIT.tar.gz"
+ARG LIBARIBB24_SHA256=651e88af3c8189d4faed538bee3affde360eb4698a70505765fc7e5653f5eb23
 RUN \
   wget $WGET_OPTS -O libaribb24.tar.gz "$LIBARIBB24_URL" && \
   echo "$LIBARIBB24_SHA256  libaribb24.tar.gz" | sha256sum -c - && \
   mkdir libaribb24 && \
   tar $TAR_OPTS libaribb24.tar.gz -C libaribb24 --strip-components=1 && cd libaribb24 && \
+  sed -i "s/AC_INIT(\\[aribb24\\], \\[1.0.3\\]/AC_INIT([aribb24], [$LIBARIBB24_VERSION]/" configure.ac && \
   autoreconf -fiv && \
   ./configure \
     --enable-static \
@@ -282,42 +281,6 @@ RUN \
     -Dbuildtype=release \
     -Ddefault_library=static && \
   ninja -j$(nproc) -vC build install
-
-# bump: davs2 /DAVS2_VERSION=([\d.]+)/ https://github.com/pkuvcl/davs2.git|^1
-# bump: davs2 after ./hashupdate Dockerfile DAVS2 $LATEST
-# bump: davs2 link "Release" https://github.com/pkuvcl/davs2/releases/tag/$LATEST
-# bump: davs2 link "Source diff $CURRENT..$LATEST" https://github.com/pkuvcl/davs2/compare/v$CURRENT..v$LATEST
-ARG DAVS2_VERSION=1.7
-ARG DAVS2_URL="https://github.com/pkuvcl/davs2/archive/refs/tags/$DAVS2_VERSION.tar.gz"
-ARG DAVS2_SHA256=b697d0b376a1c7f7eda3a4cc6d29707c8154c4774358303653f0a9727f923cc8
-# TODO: seems to be issues with asm on musl
-RUN \
-  wget $WGET_OPTS -O davs2.tar.gz "$DAVS2_URL" && \
-  echo "$DAVS2_SHA256  davs2.tar.gz" | sha256sum -c - && \
-  tar $TAR_OPTS davs2.tar.gz && cd davs2-*/build/linux && \
-  ./configure \
-    --disable-asm \
-    --enable-pic \
-    --enable-strip \
-    --disable-cli && \
-  make -j$(nproc) install
-
-# bump: fdk-aac /FDK_AAC_VERSION=([\d.]+)/ https://github.com/mstorsjo/fdk-aac.git|*
-# bump: fdk-aac after ./hashupdate Dockerfile FDK_AAC $LATEST
-# bump: fdk-aac link "ChangeLog" https://github.com/mstorsjo/fdk-aac/blob/master/ChangeLog
-# bump: fdk-aac link "Source diff $CURRENT..$LATEST" https://github.com/mstorsjo/fdk-aac/compare/v$CURRENT..v$LATEST
-ARG FDK_AAC_VERSION=2.0.3
-ARG FDK_AAC_URL="https://github.com/mstorsjo/fdk-aac/archive/v$FDK_AAC_VERSION.tar.gz"
-ARG FDK_AAC_SHA256=e25671cd96b10bad896aa42ab91a695a9e573395262baed4e4a2ff178d6a3a78
-RUN \
-  wget $WGET_OPTS -O fdk-aac.tar.gz "$FDK_AAC_URL" && \
-  echo "$FDK_AAC_SHA256  fdk-aac.tar.gz" | sha256sum -c - && \
-  tar $TAR_OPTS fdk-aac.tar.gz && cd fdk-aac-* && \
-  ./autogen.sh && \
-  ./configure \
-    --disable-shared \
-    --enable-static && \
-  make -j$(nproc) install
 
 # bump: libgme /LIBGME_COMMIT=([[:xdigit:]]+)/ gitrefs:https://github.com/libgme/game-music-emu.git|re:#^refs/heads/master$#|@commit
 # bump: libgme after ./hashupdate Dockerfile LIBGME $LATEST
@@ -425,9 +388,9 @@ RUN \
 # bump: libmysofa after ./hashupdate Dockerfile LIBMYSOFA $LATEST
 # bump: libmysofa link "Release" https://github.com/hoene/libmysofa/releases/tag/v$LATEST
 # bump: libmysofa link "Source diff $CURRENT..$LATEST" https://github.com/hoene/libmysofa/compare/v$CURRENT..v$LATEST
-ARG LIBMYSOFA_VERSION=1.3.3
+ARG LIBMYSOFA_VERSION=1.3.4
 ARG LIBMYSOFA_URL="https://github.com/hoene/libmysofa/archive/refs/tags/v$LIBMYSOFA_VERSION.tar.gz"
-ARG LIBMYSOFA_SHA256=a15f7236a2b492f8d8da69f6c71b5bde1ef1bac0ef428b94dfca1cabcb24c84f
+ARG LIBMYSOFA_SHA256=64c661f75ef39edf68bfc3a28403d2b5a0bd251d0b9f5d021ed6f7917867fb37
 RUN \
   wget $WGET_OPTS -O libmysofa.tar.gz "$LIBMYSOFA_URL" && \
   echo "$LIBMYSOFA_SHA256  libmysofa.tar.gz" | sha256sum -c - && \
@@ -549,24 +512,6 @@ RUN \
   git clone "$LIBRTMP_URL" && cd rtmpdump && \
   git checkout --recurse-submodules $LIBRTMP_COMMIT && \
   make SYS=posix SHARED=off -j$(nproc) install
-
-# bump: rubberband /RUBBERBAND_VERSION=([\d.]+)/ https://github.com/breakfastquay/rubberband.git|^2
-# bump: rubberband after ./hashupdate Dockerfile RUBBERBAND $LATEST
-# bump: rubberband link "CHANGELOG" https://github.com/breakfastquay/rubberband/blob/default/CHANGELOG
-# bump: rubberband link "Source diff $CURRENT..$LATEST" https://github.com/breakfastquay/rubberband/compare/$CURRENT..$LATEST
-ARG RUBBERBAND_VERSION=2.0.2
-ARG RUBBERBAND_URL="https://breakfastquay.com/files/releases/rubberband-$RUBBERBAND_VERSION.tar.bz2"
-ARG RUBBERBAND_SHA256=b9eac027e797789ae99611c9eaeaf1c3a44cc804f9c8a0441a0d1d26f3d6bdf9
-RUN \
-  wget $WGET_OPTS -O rubberband.tar.bz2 "$RUBBERBAND_URL" && \
-  echo "$RUBBERBAND_SHA256  rubberband.tar.bz2" | sha256sum -c - && \
-  tar $TAR_OPTS rubberband.tar.bz2 && cd rubberband-* && \
-  meson setup build \
-    -Ddefault_library=static \
-    -Dfft=fftw \
-    -Dresampler=libsamplerate && \
-  ninja -j$(nproc) -vC build install && \
-  echo "Requires.private: fftw3 samplerate" >> /usr/local/lib/pkgconfig/rubberband.pc
 
 # bump: libshine /LIBSHINE_VERSION=([\d.]+)/ https://github.com/toots/shine.git|*
 # bump: libshine after ./hashupdate Dockerfile LIBSHINE $LATEST
@@ -713,7 +658,7 @@ RUN \
 # bump: theora link "Release notes" https://github.com/xiph/theora/releases/tag/v$LATEST
 # bump: theora link "Source diff $CURRENT..$LATEST" https://github.com/xiph/theora/compare/v$CURRENT..v$LATEST
 ARG THEORA_VERSION=1.2.0
-ARG THEORA_URL="http://downloads.xiph.org/releases/theora/libtheora-$THEORA_VERSION.tar.gz"
+ARG THEORA_URL="https://ftp.osuosl.org/pub/xiph/releases/theora/libtheora-$THEORA_VERSION.tar.gz"
 ARG THEORA_SHA256=279327339903b544c28a92aeada7d0dcfd0397b59c2f368cc698ac56f515906e
 RUN \
   wget $WGET_OPTS -O libtheora.tar.bz2 "$THEORA_URL" && \
@@ -763,31 +708,6 @@ RUN \
     -DBUILD_SHARED_LIBS=OFF \
     ../.. && \
   make -j$(nproc) install
-
-# bump: vid.stab /VIDSTAB_VERSION=([\d.]+)/ https://github.com/georgmartius/vid.stab.git|*
-# bump: vid.stab after ./hashupdate Dockerfile VIDSTAB $LATEST
-# bump: vid.stab link "Changelog" https://github.com/georgmartius/vid.stab/blob/master/Changelog
-ARG VIDSTAB_VERSION=1.1.1
-ARG VIDSTAB_URL="https://github.com/georgmartius/vid.stab/archive/v$VIDSTAB_VERSION.tar.gz"
-ARG VIDSTAB_SHA256=9001b6df73933555e56deac19a0f225aae152abbc0e97dc70034814a1943f3d4
-RUN \
-  wget $WGET_OPTS -O vid.stab.tar.gz "$VIDSTAB_URL" && \
-  echo "$VIDSTAB_SHA256  vid.stab.tar.gz" | sha256sum -c - && \
-  tar $TAR_OPTS vid.stab.tar.gz && cd vid.stab-* && \
-  mkdir build && cd build && \
-  # This line workarounds the issue that happens when the image builds in emulated (buildx) arm64 environment.
-  # Since in emulated container the /proc is mounted from the host, the cmake not able to detect CPU features correctly.
-  sed -i 's/include (FindSSE)/if(CMAKE_SYSTEM_ARCH MATCHES "amd64")\ninclude (FindSSE)\nendif()/' ../CMakeLists.txt && \
-  cmake \
-    -G"Unix Makefiles" \
-    -DCMAKE_VERBOSE_MAKEFILE=ON \
-    -DCMAKE_SYSTEM_ARCH=$(arch) \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DBUILD_SHARED_LIBS=OFF \
-    -DUSE_OMP=ON \
-    .. && \
-  make -j$(nproc) install
-RUN echo "Libs.private: -ldl" >> /usr/local/lib/pkgconfig/vidstab.pc
 
 # bump: vorbis /VORBIS_VERSION=([\d.]+)/ https://github.com/xiph/vorbis.git|*
 # bump: vorbis after ./hashupdate Dockerfile VORBIS $LATEST
@@ -851,74 +771,6 @@ RUN \
     --disable-tiff \
     --disable-gif && \
   make -j$(nproc) install
-
-# x264 only have a stable branch no tags and we checkout commit so no hash is needed
-# bump: x264 /X264_VERSION=([[:xdigit:]]+)/ gitrefs:https://code.videolan.org/videolan/x264.git|re:#^refs/heads/stable$#|@commit
-# bump: x264 after ./hashupdate Dockerfile X264 $LATEST
-# bump: x264 link "Source diff $CURRENT..$LATEST" https://code.videolan.org/videolan/x264/-/compare/$CURRENT...$LATEST
-ARG X264_URL="https://code.videolan.org/videolan/x264.git"
-ARG X264_VERSION=b35605ace3ddf7c1a5d67a2eb553f034aef41d55
-RUN \
-  git clone "$X264_URL" && cd x264 && \
-  git checkout --recurse-submodules $X264_VERSION && \
-  ./configure \
-    --enable-pic \
-    --enable-static \
-    --disable-cli \
-    --disable-lavf \
-    --disable-swscale && \
-  make -j$(nproc) install
-
-# bump: x265 /X265_VERSION=([\d.]+)/ https://bitbucket.org/multicoreware/x265_git.git|*
-# bump: x265 after ./hashupdate Dockerfile X265 $LATEST
-# bump: x265 link "Source diff $CURRENT..$LATEST" https://bitbucket.org/multicoreware/x265_git/branches/compare/$LATEST..$CURRENT#diff
-ARG X265_VERSION=4.0
-ARG X265_SHA256=75b4d05629e365913de3100b38a459b04e2a217a8f30efaa91b572d8e6d71282
-ARG X265_URL="https://bitbucket.org/multicoreware/x265_git/downloads/x265_$X265_VERSION.tar.gz"
-# CMAKEFLAGS issue
-# https://bitbucket.org/multicoreware/x265_git/issues/620/support-passing-cmake-flags-to-multilibsh
-RUN \
-  wget $WGET_OPTS -O x265_git.tar.bz2 "$X265_URL" && \
-  echo "$X265_SHA256  x265_git.tar.bz2" | sha256sum -c - && \
-  tar $TAR_OPTS x265_git.tar.bz2 && cd x265_*/build/linux && \
-  sed -i '/^cmake / s/$/ -G "Unix Makefiles" ${CMAKEFLAGS}/' ./multilib.sh && \
-  sed -i 's/ -DENABLE_SHARED=OFF//g' ./multilib.sh && \
-  MAKEFLAGS="-j$(nproc)" \
-  CMAKEFLAGS="-DENABLE_SHARED=OFF -DCMAKE_VERBOSE_MAKEFILE=ON -DENABLE_AGGRESSIVE_CHECKS=ON -DENABLE_NASM=ON -DCMAKE_BUILD_TYPE=Release" \
-  ./multilib.sh && \
-  make -C 8bit -j$(nproc) install
-
-# bump: xavs2 /XAVS2_VERSION=([\d.]+)/ https://github.com/pkuvcl/xavs2.git|^1
-# bump: xavs2 after ./hashupdate Dockerfile XAVS2 $LATEST
-# bump: xavs2 link "Release" https://github.com/pkuvcl/xavs2/releases/tag/$LATEST
-# bump: xavs2 link "Source diff $CURRENT..$LATEST" https://github.com/pkuvcl/xavs2/compare/v$CURRENT..v$LATEST
-ARG XAVS2_VERSION=1.4
-ARG XAVS2_URL="https://github.com/pkuvcl/xavs2/archive/refs/tags/$XAVS2_VERSION.tar.gz"
-ARG XAVS2_SHA256=1e6d731cd64cb2a8940a0a3fd24f9c2ac3bb39357d802432a47bc20bad52c6ce
-# TODO: seems to be issues with asm on musl
-RUN \
-  wget $WGET_OPTS -O xavs2.tar.gz "$XAVS2_URL" && \
-  echo "$XAVS2_SHA256  xavs2.tar.gz" | sha256sum -c - && \
-  tar $TAR_OPTS xavs2.tar.gz && cd xavs2-*/build/linux && \
-  ./configure \
-    --disable-asm \
-    --enable-pic \
-    --disable-cli && \
-  make -j$(nproc) install
-
-# http://websvn.xvid.org/cvs/viewvc.cgi/trunk/xvidcore/build/generic/configure.in?revision=2146&view=markup
-# bump: xvid /XVID_VERSION=([\d.]+)/ svn:https://anonymous:@svn.xvid.org|/^release-(.*)$/|/_/./|^1
-# bump: xvid after ./hashupdate Dockerfile XVID $LATEST
-# add extra CFLAGS that are not enabled by -O3
-ARG XVID_VERSION=1.3.7
-ARG XVID_URL="https://downloads.xvid.com/downloads/xvidcore-$XVID_VERSION.tar.gz"
-ARG XVID_SHA256=abbdcbd39555691dd1c9b4d08f0a031376a3b211652c0d8b3b8aa9be1303ce2d
-RUN \
-  wget $WGET_OPTS -O libxvid.tar.gz "$XVID_URL" && \
-  echo "$XVID_SHA256  libxvid.tar.gz" | sha256sum -c - && \
-  tar $TAR_OPTS libxvid.tar.gz && cd xvidcore/build/generic && \
-  CFLAGS="$CFLAGS -fstrength-reduce -ffast-math" ./configure && \
-  make -j$(nproc) && make install
 
 # bump: xeve /XEVE_VERSION=([\d.]+)/ https://github.com/mpeg5/xeve.git|*
 # bump: xeve after ./hashupdate Dockerfile XEVE $LATEST
@@ -1111,189 +963,170 @@ RUN \
 ARG FFMPEG_VERSION=8.0
 ARG FFMPEG_URL="https://ffmpeg.org/releases/ffmpeg-$FFMPEG_VERSION.tar.bz2"
 ARG FFMPEG_SHA256=3e74acc48ddb9f5f70b6747d3f439d51e7cc5497f097d58e5975c84488f4d186
-ARG ENABLE_FDKAAC=
-# sed changes --toolchain=hardened -pie to -static-pie
-#
-# ldflags stack-size=2097152 is to increase default stack size from 128KB (musl default) to something
-# more similar to glibc (2MB). This fixing segfault with libaom-av1 and libsvtav1 as they seems to pass
-# large things on the stack.
-#
-# ldfalgs -Wl,--allow-multiple-definition is a workaround for linking with multiple rust staticlib to
-# not cause collision in toolchain symbols, see comment in checkdupsym script for details.
+ARG OPENH264_VERSION=2.6.0
+ARG OPENH264_URL="https://github.com/cisco/openh264/archive/refs/tags/v$OPENH264_VERSION.tar.gz"
+ARG OPENH264_SHA256=558544ad358283a7ab2930d69a9ceddf913f4a51ee9bf1bfb9e377322af81a69
+
+COPY scripts/build-ffmpeg.sh /usr/local/bin/build-ffmpeg.sh
+COPY scripts/make-license-json.sh /usr/local/bin/make-license-json.sh
+COPY scripts/verify-ffmpeg-license.sh /usr/local/bin/verify-ffmpeg-license.sh
+COPY scripts/oski-openh264 /usr/local/bin/oski-openh264
+COPY scripts/oski-amr /usr/local/bin/oski-amr
+COPY scripts/openh264-glibc-shim.c /tmp/openh264-glibc-shim.c
+COPY licenses/external-libs.json /licenses/external-libs.json
+
+RUN gcc -shared -fPIC -O2 -o /usr/local/lib/liboski-openh264-glibc-shim.so /tmp/openh264-glibc-shim.c
+
+RUN \
+  wget $WGET_OPTS -O openh264.tar.gz "$OPENH264_URL" && \
+  echo "$OPENH264_SHA256  openh264.tar.gz" | sha256sum -c - && \
+  tar $TAR_OPTS openh264.tar.gz && cd openh264-* && \
+  make -j$(nproc) PREFIX=/usr/local install-shared
+
 RUN \
   wget $WGET_OPTS -O ffmpeg.tar.bz2 "$FFMPEG_URL" && \
   echo "$FFMPEG_SHA256  ffmpeg.tar.bz2" | sha256sum -c - && \
   tar $TAR_OPTS ffmpeg.tar.bz2 && cd ffmpeg* && \
   # workaround for https://gitlab.com/AOMediaCodec/SVT-AV1/-/merge_requests/2387
   sed -i 's/svt_av1_enc_init_handle(&svt_enc->svt_handle, svt_enc, &svt_enc->enc_params)/svt_av1_enc_init_handle(\&svt_enc->svt_handle, \&svt_enc->enc_params)/g' libavcodec/libsvtav1.c && \
-  FDKAAC_FLAGS=$(if [[ -n "$ENABLE_FDKAAC" ]] ;then echo " --enable-libfdk-aac --enable-nonfree " ;else echo ""; fi) && \
+  cp configure configure.orig && \
+  cp configure.orig configure && \
   sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
-  ./configure \
-  --pkg-config-flags="--static" \
-  --extra-cflags="-fopenmp" \
-  --extra-ldflags="-fopenmp -Wl,--allow-multiple-definition -Wl,-z,stack-size=2097152" \
-  --toolchain=hardened \
-  --disable-debug \
-  --disable-shared \
-  --disable-ffplay \
-  --enable-static \
-  --enable-gpl \
-  --enable-version3 \
-  $FDKAAC_FLAGS \
-  --enable-fontconfig \
-  --enable-gray \
-  --enable-iconv \
-  --enable-lcms2 \
-  --enable-libaom \
-  --enable-libaribb24 \
-  --enable-libass \
-  --enable-libbluray \
-  --enable-libdav1d \
-  --enable-libdavs2 \
-  --enable-libfreetype \
-  --enable-libfribidi \
-  --enable-libgme \
-  --enable-libgsm \
-  --enable-libharfbuzz \
-  --enable-libjxl \
-  --enable-libkvazaar \
-  --enable-libmodplug \
-  --enable-libmp3lame \
-  --enable-libmysofa \
-  --enable-libopencore-amrnb \
-  --enable-libopencore-amrwb \
-  --enable-libopenjpeg \
-  --enable-libopus \
-  --enable-librabbitmq \
-  --enable-librav1e \
-  --enable-librsvg \
-  --enable-librtmp \
-  --enable-librubberband \
-  --enable-libshine \
-  --enable-libsnappy \
-  --enable-libsoxr \
-  --enable-libspeex \
-  --enable-libsrt \
-  --enable-libssh \
-  --enable-libsvtav1 \
-  --enable-libtheora \
-  --enable-libtwolame \
-  --enable-libuavs3d \
-  --enable-libvidstab \
-  --enable-libvmaf \
-  --enable-libvo-amrwbenc \
-  --enable-libvorbis \
-  --enable-libvpl \
-  --enable-libvpx \
-  --enable-libvvenc \
-  --enable-libwebp \
-  --enable-libx264 \
-  --enable-libx265 \
-  --enable-libxavs2 \
-  --enable-libxevd \
-  --enable-libxeve \
-  --enable-libxml2 \
-  --enable-libxvid \
-  --enable-libzimg \
-  --enable-libzmq \
-  --enable-openssl \
-  || (cat ffbuild/config.log ; false) \
-  && make -j$(nproc) install
+  /usr/local/bin/build-ffmpeg.sh static
+
+# make sure default static binaries have no dependencies, are relro, pie and stack nx
+COPY checkelf /
+COPY checkdupsym /
+RUN \
+  /checkelf /usr/local/bin/ffmpeg && \
+  /checkelf /usr/local/bin/ffprobe && \
+  /checkdupsym /ffmpeg-*
 
 RUN \
-  EXPAT_VERSION=$(pkg-config --modversion expat) \
-  FFTW_VERSION=$(pkg-config --modversion fftw3) \
-  FONTCONFIG_VERSION=$(pkg-config --modversion fontconfig) \
-  FREETYPE_VERSION=$(pkg-config --modversion freetype2) \
-  FRIBIDI_VERSION=$(pkg-config --modversion fribidi) \
-  LIBSAMPLERATE_VERSION=$(pkg-config --modversion samplerate) \
-  LIBVO_AMRWBENC_VERSION=$(pkg-config --modversion vo-amrwbenc) \
-  LIBXML2_VERSION=$(pkg-config --modversion libxml-2.0) \
-  OPENSSL_VERSION=$(pkg-config --modversion openssl) \
-  SNAPPY_VERSION=$(apk info -a snappy $APK_OPTS | head -n1 | awk '{print $1}' | sed -e 's/snappy-//') \
-  SOXR_VERSION=$(pkg-config --modversion soxr) \
+  cd ffmpeg-* && \
+  make distclean && \
+  cp configure.orig configure && \
+  DESTDIR=/opt/oski-shared /usr/local/bin/build-ffmpeg.sh shared
+
+RUN \
+  cd ffmpeg-* && \
+  make distclean && \
+  cp configure.orig configure && \
+  sed -i 's/add_ldexeflags -fPIE -pie/add_ldexeflags -fPIE -static-pie/' configure && \
+  DESTDIR=/opt/oski-amr /usr/local/bin/build-ffmpeg.sh amr
+
+RUN \
+  cd ffmpeg-* && \
+  make distclean && \
+  cp configure.orig configure && \
+  DESTDIR=/opt/oski-openh264 /usr/local/bin/build-ffmpeg.sh openh264
+
+RUN \
+	  EXPAT_VERSION=$(pkg-config --modversion expat) \
+		  FONTCONFIG_VERSION=$(pkg-config --modversion fontconfig) \
+	  FREETYPE_VERSION=$(pkg-config --modversion freetype2) \
+	  FRIBIDI_VERSION=$(pkg-config --modversion fribidi) \
+		  LIBOPENH264_VERSION=$(pkg-config --modversion openh264) \
+	  LIBVO_AMRWBENC_VERSION=$(pkg-config --modversion vo-amrwbenc) \
+	  LIBXML2_VERSION=$(pkg-config --modversion libxml-2.0) \
+	  OPENSSL_VERSION=$(pkg-config --modversion openssl) \
+	  SNAPPY_VERSION=$(apk info -a snappy $APK_OPTS | head -n1 | awk '{print $1}' | sed -e 's/snappy-//') \
+	  SOXR_VERSION=$(pkg-config --modversion soxr) \
   jq -n \
   '{ \
   expat: env.EXPAT_VERSION, \
-  "libfdk-aac": env.FDK_AAC_VERSION, \
-  ffmpeg: env.FFMPEG_VERSION, \
-  fftw: env.FFTW_VERSION, \
-  fontconfig: env.FONTCONFIG_VERSION, \
-  lcms2: env.LCMS2_VERSION, \
-  libaom: env.AOM_VERSION, \
-  libaribb24: env.LIBARIBB24_VERSION, \
-  libass: env.LIBASS_VERSION, \
-  libbluray: env.LIBBLURAY_VERSION, \
-  libdav1d: env.DAV1D_VERSION, \
-  libdavs2: env.DAVS2_VERSION, \
-  libfreetype: env.FREETYPE_VERSION, \
-  libfribidi: env.FRIBIDI_VERSION, \
-  libgme: env.LIBGME_COMMIT, \
-  libgsm: env.LIBGSM_COMMIT, \
-  libharfbuzz: env.LIBHARFBUZZ_VERSION, \
+	  ffmpeg: env.FFMPEG_VERSION, \
+		  fontconfig: env.FONTCONFIG_VERSION, \
+	  lcms2: env.LCMS2_VERSION, \
+	  libaom: env.AOM_VERSION, \
+	  libaribb24: env.LIBARIBB24_VERSION, \
+	  libass: env.LIBASS_VERSION, \
+	  libbluray: env.LIBBLURAY_VERSION, \
+	  libdav1d: env.DAV1D_VERSION, \
+	  libfreetype: env.FREETYPE_VERSION, \
+	  libfribidi: env.FRIBIDI_VERSION, \
+	  libgme: env.LIBGME_COMMIT, \
+	  libgsm: env.LIBGSM_COMMIT, \
+	  libharfbuzz: env.LIBHARFBUZZ_VERSION, \
   libjxl: env.LIBJXL_VERSION, \
   libkvazaar: env.KVAZAAR_VERSION, \
   libmodplug: env.LIBMODPLUG_VERSION, \
   libmp3lame: env.MP3LAME_VERSION, \
   libmysofa: env.LIBMYSOFA_VERSION, \
   libogg: env.OGG_VERSION, \
-  libopencoreamr: env.OPENCOREAMR_VERSION, \
-  libopenjpeg: env.OPENJPEG_VERSION, \
-  libopus: env.OPUS_VERSION, \
-  librabbitmq: env.LIBRABBITMQ_VERSION, \
-  librav1e: env.RAV1E_VERSION, \
-  librsvg: env.LIBRSVG_VERSION, \
-  librtmp: env.LIBRTMP_COMMIT, \
-  librubberband: env.RUBBERBAND_VERSION, \
-  libsamplerate: env.LIBSAMPLERATE_VERSION, \
-  libshine: env.LIBSHINE_VERSION, \
-  libsnappy: env.SNAPPY_VERSION, \
-  libsoxr: env.SOXR_VERSION, \
-  libspeex: env.SPEEX_VERSION, \
+	  libopencoreamr: env.OPENCOREAMR_VERSION, \
+	  libopenh264: env.LIBOPENH264_VERSION, \
+	  libopenjpeg: env.OPENJPEG_VERSION, \
+	  libopus: env.OPUS_VERSION, \
+	  librabbitmq: env.LIBRABBITMQ_VERSION, \
+	  librav1e: env.RAV1E_VERSION, \
+	  librsvg: env.LIBRSVG_VERSION, \
+	  librtmp: env.LIBRTMP_COMMIT, \
+		  libshine: env.LIBSHINE_VERSION, \
+	  libsnappy: env.SNAPPY_VERSION, \
+	  libsoxr: env.SOXR_VERSION, \
+	  libspeex: env.SPEEX_VERSION, \
   libsrt: env.SRT_VERSION, \
   libssh: env.LIBSSH_VERSION, \
   libsvtav1: env.SVTAV1_VERSION, \
-  libtheora: env.THEORA_VERSION, \
-  libtwolame: env.TWOLAME_VERSION, \
-  libuavs3d: env.UAVS3D_COMMIT, \
-  libva: env.LIBVA_VERSION, \
-  libvidstab: env.VIDSTAB_VERSION, \
-  libvmaf: env.VMAF_VERSION, \
-  libvo_amrwbenc: env.LIBVO_AMRWBENC_VERSION, \
-  libvorbis: env.VORBIS_VERSION, \
-  libvpl: env.LIBVPL_VERSION, \
-  libvpx: env.VPX_VERSION, \
-  libvvenc: env.VVENC_VERSION, \
-  libwebp: env.LIBWEBP_VERSION, \
-  libx264: env.X264_VERSION, \
-  libx265: env.X265_VERSION, \
-  libxavs2: env.XAVS2_VERSION, \
-  libxevd: env.XEVD_VERSION, \
-  libxeve: env.XEVE_VERSION, \
-  libxml2: env.LIBXML2_VERSION, \
-  libxvid: env.XVID_VERSION, \
-  libzimg: env.ZIMG_VERSION, \
-  libzmq: env.LIBZMQ_VERSION, \
-  openssl: env.OPENSSL_VERSION, \
-  }' > /versions.json
+	  libtheora: env.THEORA_VERSION, \
+	  libtwolame: env.TWOLAME_VERSION, \
+	  libuavs3d: env.UAVS3D_COMMIT, \
+	  libva: env.LIBVA_VERSION, \
+	  libvmaf: env.VMAF_VERSION, \
+	  libvo_amrwbenc: env.LIBVO_AMRWBENC_VERSION, \
+	  libvorbis: env.VORBIS_VERSION, \
+	  libvpl: env.LIBVPL_VERSION, \
+	  libvpx: env.VPX_VERSION, \
+	  libvvenc: env.VVENC_VERSION, \
+	  libwebp: env.LIBWEBP_VERSION, \
+	  libxevd: env.XEVD_VERSION, \
+	  libxeve: env.XEVE_VERSION, \
+	  libxml2: env.LIBXML2_VERSION, \
+	  libzimg: env.ZIMG_VERSION, \
+	  libzmq: env.LIBZMQ_VERSION, \
+	  openssl: env.OPENSSL_VERSION, \
+		  sonames: { \
+		    libavformat: "libavformat.so.62", \
+		    libavcodec: "libavcodec.so.62", \
+		    libavdevice: "libavdevice.so.62", \
+		    libavfilter: "libavfilter.so.11", \
+		    libavutil: "libavutil.so.60", \
+		    libswresample: "libswresample.so.6", \
+		    libswscale: "libswscale.so.9" \
+		  } \
+	  }' > /versions.json
 
-# make sure binaries has no dependencies, is relro, pie and stack nx
-COPY checkelf /
 RUN \
-  /checkelf /usr/local/bin/ffmpeg && \
-  /checkelf /usr/local/bin/ffprobe
-# workaround for using -Wl,--allow-multiple-definition
-# see comment in checkdupsym for details
-COPY checkdupsym /
-RUN /checkdupsym /ffmpeg-*
+  /usr/local/bin/make-license-json.sh ffmpeg-bin && cp /license.json /license-ffmpeg-bin.json && \
+  /usr/local/bin/make-license-json.sh ffmpeg-dev && cp /license.json /license-ffmpeg-dev.json && \
+  /usr/local/bin/make-license-json.sh ffmpeg-shared && cp /license.json /license-ffmpeg-shared.json && \
+  /usr/local/bin/make-license-json.sh openh264-runtime && cp /license.json /license-openh264-runtime.json && \
+  /usr/local/bin/make-license-json.sh amr-runtime && cp /license.json /license-amr-runtime.json
+
+RUN TARGET=ffmpeg-bin FFMPEG=/usr/local/bin/ffmpeg PROBE=/usr/local/bin/ffprobe /usr/local/bin/verify-ffmpeg-license.sh
+RUN TARGET=ffmpeg-dev FFMPEG=/usr/local/bin/ffmpeg PROBE=/usr/local/bin/ffprobe /usr/local/bin/verify-ffmpeg-license.sh
+RUN TARGET=ffmpeg-shared FFMPEG=/opt/oski-shared/usr/local/bin/ffmpeg PROBE=/opt/oski-shared/usr/local/bin/ffprobe LIBDIR=/opt/oski-shared/usr/local/lib LD_LIBRARY_PATH=/opt/oski-shared/usr/local/lib /usr/local/bin/verify-ffmpeg-license.sh
+RUN TARGET=openh264-runtime FFMPEG=/opt/oski-openh264/usr/local/bin/ffmpeg PROBE=/opt/oski-openh264/usr/local/bin/ffprobe LD_LIBRARY_PATH=/usr/local/lib /usr/local/bin/verify-ffmpeg-license.sh
+RUN TARGET=amr-runtime FFMPEG=/opt/oski-amr/usr/local/bin/ffmpeg PROBE=/opt/oski-amr/usr/local/bin/ffprobe /usr/local/bin/verify-ffmpeg-license.sh
+
+RUN \
+  mkdir -p /opt/oski-dev/usr/local/lib /opt/oski-dev/usr/local/include /opt/oski-dev/usr/local/lib/pkgconfig && \
+  cp -a /usr/local/lib/*.a /opt/oski-dev/usr/local/lib/ && \
+  cp -a /usr/local/include/. /opt/oski-dev/usr/local/include/ && \
+  cp -a /usr/local/lib/pkgconfig/. /opt/oski-dev/usr/local/lib/pkgconfig/ && \
+  rm -f /opt/oski-dev/usr/local/lib/libopencore-amr*.a /opt/oski-dev/usr/local/lib/libopenh264*.a && \
+  rm -f /opt/oski-dev/usr/local/lib/pkgconfig/opencore-amr*.pc /opt/oski-dev/usr/local/lib/pkgconfig/openh264.pc && \
+  rm -rf /opt/oski-dev/usr/local/include/opencore-amrnb /opt/oski-dev/usr/local/include/opencore-amrwb /opt/oski-dev/usr/local/include/wels
 
 # some basic fonts that don't take up much space
 RUN apk add $APK_OPTS font-terminus font-inconsolata font-dejavu font-awesome
 
-FROM scratch AS final1
+FROM scratch AS ffmpeg-bin
 COPY --from=builder /usr/local/bin/ffmpeg /
 COPY --from=builder /usr/local/bin/ffprobe /
 COPY --from=builder /versions.json /
+COPY --from=builder /license-ffmpeg-bin.json /license.json
 COPY --from=builder /usr/local/share/doc/ffmpeg/* /doc/
 COPY --from=builder /etc/ssl/cert.pem /etc/ssl/cert.pem
 COPY --from=builder /etc/fonts/ /etc/fonts/
@@ -1305,23 +1138,71 @@ COPY --from=builder /var/cache/fontconfig/ /var/cache/fontconfig/
 RUN ["/ffmpeg", "-version"]
 RUN ["/ffprobe", "-version"]
 RUN ["/ffmpeg", "-hide_banner", "-buildconf"]
-# stack size
-RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc", "-c:v", "libsvtav1", "-t", "100ms", "-f", "null", "-"]
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc=duration=0.1", "-c:v", "libsvtav1", "-f", "null", "-"]
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc=duration=0.1", "-c:v", "libaom-av1", "-f", "null", "-"]
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc=duration=0.1", "-c:v", "libvpx-vp9", "-f", "null", "-"]
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc=duration=0.1", "-c:v", "libwebp", "-f", "null", "-"]
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc=duration=0.1", "-c:v", "libkvazaar", "-f", "null", "-"]
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "sine=duration=0.1", "-c:a", "libopus", "-f", "null", "-"]
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "sine=duration=0.1", "-c:a", "libvorbis", "-f", "null", "-"]
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "sine=duration=0.1", "-c:a", "libmp3lame", "-f", "null", "-"]
 # dns
 RUN ["/ffprobe", "-i", "https://github.com/favicon.ico"]
 # tls/https certs
 RUN ["/ffprobe", "-tls_verify", "1", "-ca_file", "/etc/ssl/cert.pem", "-i", "https://github.com/favicon.ico"]
 # svg
 RUN ["/ffprobe", "-i", "https://github.githubassets.com/favicons/favicon.svg"]
-# vvenc
-RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc", "-c:v", "libvvenc", "-t", "100ms", "-f", "null", "-"]
-# x265 regression
-RUN ["/ffmpeg", "-f", "lavfi", "-i", "testsrc", "-c:v", "libx265", "-t", "100ms", "-f", "null", "-"]
 
-# clamp all files into one layer
-FROM scratch AS final2
-COPY --from=final1 / /
+FROM scratch AS ffmpeg-dev
+COPY --from=builder /opt/oski-dev/usr/local/lib/ /usr/local/lib/
+COPY --from=builder /opt/oski-dev/usr/local/include/ /usr/local/include/
+COPY --from=builder /opt/oski-dev/usr/local/lib/pkgconfig/ /usr/local/lib/pkgconfig/
+COPY --from=builder /versions.json /
+COPY --from=builder /license-ffmpeg-dev.json /license.json
 
-FROM final2
+FROM scratch AS ffmpeg-shared
+COPY --from=builder /opt/oski-shared/usr/local/lib/libav*.so* /usr/local/lib/
+COPY --from=builder /opt/oski-shared/usr/local/lib/libsw*.so* /usr/local/lib/
+COPY --from=builder /opt/oski-shared/usr/local/include/ /usr/local/include/
+COPY --from=builder /opt/oski-shared/usr/local/lib/pkgconfig/ /usr/local/lib/pkgconfig/
+COPY --from=builder /versions.json /
+COPY --from=builder /license-ffmpeg-shared.json /license.json
+
+FROM $ALPINE_VERSION AS openh264-runtime
+RUN apk add --no-cache ca-certificates curl bzip2 coreutils gcompat libc6-compat libgcc libstdc++
+COPY --from=builder /opt/oski-openh264/usr/local/bin/ffmpeg /usr/local/bin/ffmpeg-openh264
+COPY --from=builder /opt/oski-openh264/usr/local/bin/ffprobe /usr/local/bin/ffprobe-openh264
+COPY --from=builder /usr/local/bin/oski-openh264 /usr/local/bin/oski-openh264
+COPY --from=builder /usr/local/lib/liboski-openh264-glibc-shim.so /usr/local/lib/liboski-openh264-glibc-shim.so
+COPY --from=builder /versions.json /
+COPY --from=builder /license-openh264-runtime.json /license.json
+COPY --from=builder /usr/local/share/doc/ffmpeg/* /doc/
+COPY --from=builder /etc/ssl/cert.pem /etc/ssl/cert.pem
+COPY --from=builder /etc/fonts/ /etc/fonts/
+COPY --from=builder /usr/share/fonts/ /usr/share/fonts/
+COPY --from=builder /usr/share/consolefonts/ /usr/share/consolefonts/
+COPY --from=builder /var/cache/fontconfig/ /var/cache/fontconfig/
+RUN printf '%s\n' '#!/bin/sh' 'if [ ! -e /usr/local/lib/libopenh264.so.8 ]; then' '  echo "OpenH264 sidecar missing. Run oski-openh264 enable --accept-license first." >&2' '  exit 1' 'fi' 'export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"' 'export LD_PRELOAD="/usr/local/lib/liboski-openh264-glibc-shim.so${LD_PRELOAD:+:$LD_PRELOAD}"' 'exec /usr/local/bin/ffmpeg-openh264 "$@"' > /ffmpeg && chmod +x /ffmpeg
+RUN printf '%s\n' '#!/bin/sh' 'if [ ! -e /usr/local/lib/libopenh264.so.8 ]; then' '  echo "OpenH264 sidecar missing. Run oski-openh264 enable --accept-license first." >&2' '  exit 1' 'fi' 'export LD_LIBRARY_PATH="/usr/local/lib:${LD_LIBRARY_PATH:-}"' 'export LD_PRELOAD="/usr/local/lib/liboski-openh264-glibc-shim.so${LD_PRELOAD:+:$LD_PRELOAD}"' 'exec /usr/local/bin/ffprobe-openh264 "$@"' > /ffprobe && chmod +x /ffprobe
+ENTRYPOINT ["/ffmpeg"]
+
+FROM $ALPINE_VERSION AS amr-runtime
+RUN apk add --no-cache ca-certificates
+COPY --from=builder /opt/oski-amr/usr/local/bin/ffmpeg /ffmpeg
+COPY --from=builder /opt/oski-amr/usr/local/bin/ffprobe /ffprobe
+COPY --from=builder /usr/local/bin/oski-amr /usr/local/bin/oski-amr
+COPY --from=builder /versions.json /
+COPY --from=builder /license-amr-runtime.json /license.json
+COPY --from=builder /usr/local/share/doc/ffmpeg/* /doc/
+COPY --from=builder /etc/ssl/cert.pem /etc/ssl/cert.pem
+COPY --from=builder /etc/fonts/ /etc/fonts/
+COPY --from=builder /usr/share/fonts/ /usr/share/fonts/
+COPY --from=builder /usr/share/consolefonts/ /usr/share/consolefonts/
+COPY --from=builder /var/cache/fontconfig/ /var/cache/fontconfig/
+RUN ["/ffmpeg", "-f", "lavfi", "-i", "sine=frequency=440:duration=0.1", "-c:a", "libopencore_amrnb", "-ar", "8000", "-ac", "1", "-f", "amr", "-y", "/tmp/out.amr"]
+RUN ["/ffmpeg", "-i", "/tmp/out.amr", "-f", "null", "-"]
+ENTRYPOINT ["/ffmpeg"]
+
+FROM ffmpeg-bin
 LABEL maintainer="Mattias Wadman mattias.wadman@gmail.com"
 ENTRYPOINT ["/ffmpeg"]
