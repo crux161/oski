@@ -1,7 +1,9 @@
 ## Oski
 
-Oski builds FFmpeg 8.0 and ffprobe as hardened Alpine/musl artifacts for CLI use
-and downstream library consumers.
+Oski builds FFmpeg 8.0 and ffprobe as hardened Alpine/musl Linux artifacts for
+CLI use and downstream library consumers. A separate native macOS lane provides
+shared-library artifacts without mixing Darwin build logic into the Linux
+Dockerfile.
 
 The default image is LGPL-3.0-or-later, GPL-free, and FFmpeg `nonfree`-free. It
 does not include GPL encoders such as x264/x265/xvid, and it does not include
@@ -20,6 +22,109 @@ patent-gated AMR or OpenH264 code.
 For application/library consumers such as kiri, use `oski:8.0-shared` by
 default. Dynamic linking keeps LGPL compliance straightforward because end users
 can replace the FFmpeg shared libraries.
+
+### Local Builds
+
+The Makefile wraps the Linux Docker targets and tags them with the same names
+as the published image matrix:
+
+```sh
+make help
+make all
+make ffmpeg-bin
+make ffmpeg-dev
+make ffmpeg-shared
+make opt-in
+make smoke-openh264
+make smoke-amr
+```
+
+`make all` builds only the default LGPL/GPL-free targets. OpenH264 and AMR stay
+behind explicit opt-in targets. Useful overrides include
+`IMAGE=repo/oski VERSION=8.0 PLATFORM=linux/amd64 NO_CACHE=1 PULL=1`.
+
+To export build products from the Docker images:
+
+```sh
+make package
+make package-shared
+make package-all
+```
+
+`make package` builds, exports, and archives only the default GPL-free targets.
+Unpacked root filesystems land in `dist/export/<target>/`; tarballs land in
+`dist/packages/oski-8.0-<target>.tar.gz`. `make package-all` includes the
+opt-in OpenH264 and AMR targets.
+
+### Linux Architecture Builds
+
+Oski supports Linux `amd64` and `arm64` builds through Docker's platform
+selection. On a native `amd64` Docker host, `linux/amd64` builds run natively
+and do not require an arm64-to-amd64 cross-compile path:
+
+```sh
+make package PLATFORM=linux/amd64
+make package-bin PLATFORM=linux/amd64
+make package-shared PLATFORM=linux/amd64
+make package-dev PLATFORM=linux/amd64
+```
+
+Use `PLATFORM=linux/arm64` for arm64 builds. If both architectures are built
+from the same checkout, set architecture-specific output paths so the second
+build does not overwrite the first build's exported root filesystems and
+tarballs:
+
+```sh
+make package PLATFORM=linux/amd64 \
+  PACKAGE_PREFIX=oski-8.0-linux-amd64 \
+  EXPORT_DIR=dist/export/linux-amd64
+
+make package PLATFORM=linux/arm64 \
+  PACKAGE_PREFIX=oski-8.0-linux-arm64 \
+  EXPORT_DIR=dist/export/linux-arm64
+```
+
+For published multi-architecture Docker images, use Docker Buildx to create a
+manifest list. For exported build products, prefer separate per-architecture
+package runs so each tarball names its target architecture explicitly.
+
+### Native macOS Shared Build
+
+The macOS build lives under `platforms/macos/` and is intentionally isolated
+from the Linux Docker implementation. It uses a native macOS runner, Xcode
+command line tools, Mach-O install names, and `lipo`/`otool` checks while
+preserving Oski's default license policy: LGPL-3.0-or-later, no GPL, no FFmpeg
+`nonfree`, and no default AMR/OpenH264/VideoToolbox H.264 or HEVC encoders.
+
+Check or install the Homebrew dependency set explicitly:
+
+```sh
+make macos-deps
+make macos-deps-install
+```
+
+Build, verify, and package the shared macOS artifact:
+
+```sh
+make macos-shared
+make verify-macos-shared
+make package-macos-shared
+```
+
+The default `MACOS_ARCHS` value is the native host architecture. Universal
+artifacts can be requested when every enabled external dependency contains all
+requested slices:
+
+```sh
+make package-macos-shared MACOS_ARCHS="arm64 x86_64"
+```
+
+The staged artifact lands at `dist/macos/oski-8.0-macos-shared/`; the packaged
+tarball lands at `dist/packages/oski-8.0-macos-shared.tar.gz`. The package
+bundles non-system dynamic dependencies beside FFmpeg's dylibs and rewrites
+them to `@rpath`; Apple frameworks and `/usr/lib` system libraries remain host
+OS dependencies. See `platforms/macos/README.md` for the macOS-specific layout
+and policy details.
 
 ### CLI Usage
 
